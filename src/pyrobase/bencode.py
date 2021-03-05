@@ -49,13 +49,11 @@ class Decoder(object):
             @param check_trailer: Raise error if trailing junk is found in data?
             @raise BencodeError: Invalid data.
         """
-        try:
-            kind = self.data[self.offset:self.offset+1]
-        except (IndexError):
+        if self.offset >= len(self.data):
             raise BencodeError("Unexpected end of data at offset %d/%d" % (
                 self.offset, len(self.data),
-
             ))
+        kind = self.data[self.offset:self.offset+1]  # get bytes of length 1, not an int^
 
         if b'0' <= kind <= b'9':
             # String
@@ -129,12 +127,9 @@ class Encoder(object):
         """ Add the given object to the result.
         """
         if isinstance(obj, bool):
-            if obj:
-                self.result.extend([b"i1e"])
-            else:
-                self.result.extend([b"i0e"])
+            self.result.append(b"i1e" if obj else b"i0e")
         elif isinstance(obj, integer_types):
-            self.result.extend([b"i", text_type(obj).encode('utf-8'), b"e"])
+            self.result.extend([b"i", text_type(obj).encode(self.char_encoding), b"e"])
         elif isinstance(obj, string_types):
             if isinstance(obj, text_type):
                 obj = obj.encode(self.char_encoding)
@@ -145,22 +140,11 @@ class Encoder(object):
         elif hasattr(obj, "__bencode__"):
             self.encode(obj.__bencode__())
         elif hasattr(obj, "items"):
-            # I don't like this fix. It probably would be better to fix whatever method passes the input but this
-            # was quicker and it works so here we are. It's needed to fix the TypeError: '<' not supported between
-            # instances of 'bytes' and 'str' error in the following section labeled as 'Dictionary'.
-            for key, val in obj.items():
-                #print('key: ', key)
-                #print('val: ', val)
-                try:
-                    newobj[key.encode('utf-8')] = val
-                except:
-                    newobj[key] = val
-                #print('newkey: ', key)
-            obj = newobj
-
             # Dictionary
             self.result.append(b'd')
             for key, val in sorted(obj.items()):
+                if isinstance(key, integer_types):
+                    key = text_type(key).encode(self.char_encoding)
                 if not isinstance(key, string_types + (binary_type,)):
                     raise BencodeError("Dict key must be bytestring, found '%s'" % key)
                 if isinstance(key, text_type):
@@ -211,7 +195,7 @@ def bread(stream):
 
 
 def bwrite(stream, obj):
-    """ Encode a given object to a file or data.
+    """ Encode a given object to a file or stream.
     """
     handle = None
     if not hasattr(stream, "write"):
