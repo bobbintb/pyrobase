@@ -148,7 +148,6 @@ class Encoder(object):
             # I don't like this fix. It probably would be better to fix whatever method passes the input but this
             # was quicker and it works so here we are. It's needed to fix the TypeError: '<' not supported between
             # instances of 'bytes' and 'str' error in the following section labeled as 'Dictionary'.
-            newobj = {}
             for key, val in obj.items():
                 #print('key: ', key)
                 #print('val: ', val)
